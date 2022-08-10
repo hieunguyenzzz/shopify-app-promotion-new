@@ -1,16 +1,17 @@
 // @ts-check
-import { join } from "path";
-import fs from "fs";
-import express from "express";
+import { LATEST_API_VERSION, Shopify } from "@shopify/shopify-api";
 import cookieParser from "cookie-parser";
-import { Shopify, LATEST_API_VERSION } from "@shopify/shopify-api";
+import express from "express";
+import { join } from "path";
 
-import applyAuthMiddleware from "./middleware/auth.js";
-import verifyRequest from "./middleware/verify-request.js";
+import { AppInstallations } from "./app_installations.js";
 import { setupGDPRWebHooks } from "./gdpr.js";
 import productCreator from "./helpers/product-creator.js";
-import { BillingInterval } from "./helpers/ensure-billing.js";
-import { AppInstallations } from "./app_installations.js";
+import promoCreate from "./helpers/promo-create.js";
+import promoGet from "./helpers/promo-get.js";
+import promoUpdate from "./helpers/promo-update.js";
+import applyAuthMiddleware from "./middleware/auth.js";
+import verifyRequest from "./middleware/verify-request.js";
 
 const USE_ONLINE_TOKENS = false;
 const TOP_LEVEL_OAUTH_COOKIE = "shopify_top_level_oauth";
@@ -133,7 +134,63 @@ export async function createServer(
     }
     res.status(status).send({ success: status === 200, error });
   });
+  app.get("/api/promo/get", async (req, res) => {
+    const session = await Shopify.Utils.loadCurrentSession(
+      req,
+      res,
+      app.get("use-online-tokens")
+    );
+    let status = 200;
+    let error = null;
 
+    try {
+      const data = await promoGet(session);
+      res.status(status).send(data);
+    } catch (e) {
+      console.log(`Failed to process promo/get: ${e.message}`);
+      status = 500;
+      error = e.message;
+      res.status(status).send({ success: status === 200, error });
+    }
+  });
+  app.get("/api/promo/create", async (req, res) => {
+    const session = await Shopify.Utils.loadCurrentSession(
+      req,
+      res,
+      app.get("use-online-tokens")
+    );
+    let status = 200;
+    let error = null;
+
+    try {
+      const data = await promoCreate(session, req);
+      res.status(200).send(data);
+    } catch (e) {
+      console.log(`Failed to process promo/create: ${e.message}`);
+      status = 500;
+      error = e.message;
+      res.status(status).send({ success: status === 200, error });
+    }
+  });
+  app.post("/api/promo/update", async (req, res) => {
+    const session = await Shopify.Utils.loadCurrentSession(
+      req,
+      res,
+      app.get("use-online-tokens")
+    );
+    let status = 200;
+    let error = null;
+
+    try {
+      const data = await promoUpdate(session, req);
+      res.status(200).send(data);
+    } catch (e) {
+      console.log(`Failed to process promo/create: ${e.message}`);
+      status = 500;
+      error = e.message;
+      res.status(status).send({ success: status === 200, error });
+    }
+  });
   // All endpoints after this point will have access to a request.body
   // attribute, as a result of the express.json() middleware
   app.use(express.json());

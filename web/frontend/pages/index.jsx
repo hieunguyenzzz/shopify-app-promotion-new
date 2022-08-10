@@ -1,84 +1,107 @@
+import { TitleBar } from "@shopify/app-bridge-react";
 import {
   Card,
-  Page,
+  EmptyState,
   Layout,
-  TextContainer,
-  Image,
-  Stack,
   Link,
-  Heading,
+  Page,
+  ResourceItem,
+  ResourceList,
+  Tabs,
+  TextStyle,
 } from "@shopify/polaris";
-import { TitleBar } from "@shopify/app-bridge-react";
-
-import { trophyImage } from "../assets";
-
-import { ProductsCard } from "../components";
-
+import { useCallback, useState } from "react";
+import { useAppQuery } from "../hooks/useAppQuery";
+import { useAuthenticatedFetch } from "../hooks/useAuthenticatedFetch";
+const tabs = [
+  {
+    id: "all",
+    content: "All",
+    accessibilityLabel: "All",
+    panelID: "all-content-1",
+  },
+  {
+    id: "active",
+    content: "Active",
+    panelID: "active-content-1",
+  },
+];
 export default function HomePage() {
+  const authenticatedFetch = useAuthenticatedFetch();
+  const [selected, setSelected] = useState(0);
+  const handleTabChange = useCallback(
+    (selectedTabIndex) => setSelected(selectedTabIndex),
+    []
+  );
+  const { data } = useAppQuery({
+    url: "/api/promo/get",
+    reactQueryOptions: {},
+  });
+  const shopId = data?.body?.data?.shop?.id;
+  const items = (data?.body?.data?.shop?.metafields?.edges || []).map(
+    (edge) => edge.node
+  );
   return (
-    <Page narrowWidth>
-      <TitleBar title="App name" primaryAction={null} />
+    <Page fullWidth>
+      <TitleBar
+        title={`Promotion ${shopId && "#" + shopId}`}
+        primaryAction={{
+          content: "Create Promotion",
+          loading: !shopId,
+          onAction: () => {
+            authenticatedFetch(`/api/promo/create?shopId=${shopId}`);
+          },
+        }}
+      />
       <Layout>
-        <Layout.Section>
-          <Card sectioned>
-            <Stack
-              wrap={false}
-              spacing="extraTight"
-              distribution="trailing"
-              alignment="center"
-            >
-              <Stack.Item fill>
-                <TextContainer spacing="loose">
-                  <Heading>Nice work on building a Shopify app 🎉</Heading>
-                  <p>
-                    Your app is ready to explore! It contains everything you
-                    need to get started including the{" "}
-                    <Link url="https://polaris.shopify.com/" external>
-                      Polaris design system
-                    </Link>
-                    ,{" "}
-                    <Link url="https://shopify.dev/api/admin-graphql" external>
-                      Shopify Admin API
-                    </Link>
-                    , and{" "}
-                    <Link
-                      url="https://shopify.dev/apps/tools/app-bridge"
-                      external
+        <Layout.Section fullWidth>
+          <Card>
+            <Tabs tabs={tabs} selected={selected} onSelect={handleTabChange}>
+              <Card.Section>
+                <ResourceList
+                  emptyState={
+                    <EmptyState
+                      heading="Manage discounts and promotions"
+                      action={{ content: "Create promotion" }}
+                      image="https://cdn.shopify.com/s/files/1/2376/3301/products/emptystate-files.png"
                     >
-                      App Bridge
-                    </Link>{" "}
-                    UI library and components.
-                  </p>
-                  <p>
-                    Ready to go? Start populating your app with some sample
-                    products to view and test in your store.{" "}
-                  </p>
-                  <p>
-                    Learn more about building out your app in{" "}
-                    <Link
-                      url="https://shopify.dev/apps/getting-started/add-functionality"
-                      external
-                    >
-                      this Shopify tutorial
-                    </Link>{" "}
-                    📚{" "}
-                  </p>
-                </TextContainer>
-              </Stack.Item>
-              <Stack.Item>
-                <div style={{ padding: "0 20px" }}>
-                  <Image
-                    source={trophyImage}
-                    alt="Nice work on building a Shopify app"
-                    width={120}
-                  />
-                </div>
-              </Stack.Item>
-            </Stack>
+                      <p>
+                        Create discount codes and automatic discounts that apply
+                        at checkout. You can also use discounts with{" "}
+                        <Link
+                          external
+                          url="https://help.shopify.com/en/manual/discounts/sales"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          data-polaris-unstyled="true"
+                        >
+                          compare at prices
+                        </Link>
+                        .
+                      </p>
+                    </EmptyState>
+                  }
+                  items={items}
+                  renderItem={function renderItem(item) {
+                    const { id, namespace, key, type, value } = item;
+                    return (
+                      <ResourceItem
+                        id={id}
+                        url={`/promo/${key}`}
+                        accessibilityLabel={`View details for ${key}`}
+                      >
+                        <h3>
+                          <TextStyle variation="strong">{key}</TextStyle>
+                        </h3>
+                        <div>{namespace}</div>
+                      </ResourceItem>
+                    );
+                  }}
+                  resourceName={{ singular: "file", plural: "files" }}
+                />
+              </Card.Section>
+            </Tabs>
           </Card>
-        </Layout.Section>
-        <Layout.Section>
-          <ProductsCard />
         </Layout.Section>
       </Layout>
     </Page>
