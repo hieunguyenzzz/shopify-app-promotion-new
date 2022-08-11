@@ -358,7 +358,11 @@ export default function PromoEdit() {
             <Card.Section>
               <Button
                 onClick={() => {
-                  updateAllPrice(0, items);
+                  if (!items.length) {
+                    setShowResourcePicker(true);
+                  } else {
+                    updateAllPrice(0, items);
+                  }
                 }}
                 fullWidth
                 primary
