@@ -39,7 +39,7 @@ export default async function promoCreate(session, req) {
       },
     });
   } catch (error) {
-    if (error instanceof ShopifyErrors.GraphqlQueryError) {
+    if (error.message) {
       throw new Error(
         `${error.message}\n${JSON.stringify(error.response, null, 2)}`
       );

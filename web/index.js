@@ -7,9 +7,11 @@ import { join } from "path";
 import { AppInstallations } from "./app_installations.js";
 import { setupGDPRWebHooks } from "./gdpr.js";
 import productCreator from "./helpers/product-creator.js";
+import productsByColectionGet from "./helpers/products-by-collection-get.js";
 import promoCreate from "./helpers/promo-create.js";
 import promoGet from "./helpers/promo-get.js";
 import promoUpdate from "./helpers/promo-update.js";
+import variantPriceUpdate from "./helpers/variant-price-update.js";
 import applyAuthMiddleware from "./middleware/auth.js";
 import verifyRequest from "./middleware/verify-request.js";
 
@@ -134,6 +136,26 @@ export async function createServer(
     }
     res.status(status).send({ success: status === 200, error });
   });
+  app.get("/api/products/collection", async (req, res) => {
+    const session = await Shopify.Utils.loadCurrentSession(
+      req,
+      res,
+      app.get("use-online-tokens")
+    );
+    let status = 200;
+    let error = null;
+
+    try {
+      const data = await productsByColectionGet(session, req);
+      res.status(status).send(data);
+    } catch (e) {
+      console.log(`Failed to process promo/get: ${e.message}`);
+      status = 500;
+      error = e.message;
+      res.status(status).send({ success: status === 200, error });
+    }
+  });
+
   app.get("/api/promo/get", async (req, res) => {
     const session = await Shopify.Utils.loadCurrentSession(
       req,
@@ -172,6 +194,11 @@ export async function createServer(
       res.status(status).send({ success: status === 200, error });
     }
   });
+
+  // All endpoints after this point will have access to a request.body
+  // attribute, as a result of the express.json() middleware
+  app.use(express.json());
+
   app.post("/api/promo/update", async (req, res) => {
     const session = await Shopify.Utils.loadCurrentSession(
       req,
@@ -180,7 +207,6 @@ export async function createServer(
     );
     let status = 200;
     let error = null;
-
     try {
       const data = await promoUpdate(session, req);
       res.status(200).send(data);
@@ -191,10 +217,25 @@ export async function createServer(
       res.status(status).send({ success: status === 200, error });
     }
   });
-  // All endpoints after this point will have access to a request.body
-  // attribute, as a result of the express.json() middleware
-  app.use(express.json());
+  app.post("/api/variant-price-update", async (req, res) => {
+    const session = await Shopify.Utils.loadCurrentSession(
+      req,
+      res,
+      app.get("use-online-tokens")
+    );
+    let status = 200;
+    let error = null;
 
+    try {
+      const data = await variantPriceUpdate(session, req);
+      res.status(status).send(data);
+    } catch (e) {
+      console.log(`Failed to process promo/get: ${e.message}`);
+      status = 500;
+      error = e.message;
+      res.status(status).send({ success: status === 200, error });
+    }
+  });
   app.use((req, res, next) => {
     const shop = Shopify.Utils.sanitizeShop(req.query.shop);
     if (Shopify.Context.IS_EMBEDDED_APP && shop) {

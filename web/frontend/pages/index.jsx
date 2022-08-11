@@ -84,6 +84,13 @@ export default function HomePage() {
                   items={items}
                   renderItem={function renderItem(item) {
                     const { id, namespace, key, type, value } = item;
+                    let parsedValue;
+                    try {
+                      parsedValue = JSON.parse(value);
+                    } catch (error) {
+                      console.log(error);
+                      parsedValue = {};
+                    }
                     return (
                       <ResourceItem
                         id={id}
@@ -91,9 +98,11 @@ export default function HomePage() {
                         accessibilityLabel={`View details for ${key}`}
                       >
                         <h3>
-                          <TextStyle variation="strong">{key}</TextStyle>
+                          <TextStyle variation="strong">
+                            {parsedValue.title || key}
+                          </TextStyle>
                         </h3>
-                        <div>{namespace}</div>
+                        <div>Percentage: {parsedValue.percentage}%</div>
                       </ResourceItem>
                     );
                   }}

@@ -32,14 +32,14 @@ export default async function promoUpdate(session, req) {
               namespace: NAMESPACE,
               ownerId: req.query.shopId,
               type: "multi_line_text_field",
-              value: req.body.value,
+              value: JSON.stringify(req.body),
             },
           ],
         },
       },
     });
   } catch (error) {
-    if (error instanceof ShopifyErrors.GraphqlQueryError) {
+    if (error.message) {
       throw new Error(
         `${error.message}\n${JSON.stringify(error.response, null, 2)}`
       );
