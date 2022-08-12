@@ -5,7 +5,7 @@ const PROMO_METAFIELDS_QUERY = `
 {
   shop {
     id
-    metafields(namespace: "${NAMESPACE}", first: 250) {
+    metafields(namespace: "${NAMESPACE}", first: 250,reverse: true) {
       edges{
         node{
           id
@@ -13,6 +13,8 @@ const PROMO_METAFIELDS_QUERY = `
           key
           type
           value
+          createdAt
+          updatedAt
         }
       }
     }

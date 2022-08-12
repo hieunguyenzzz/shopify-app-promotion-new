@@ -4,6 +4,7 @@ import {
   TitleBar,
 } from "@shopify/app-bridge-react";
 import {
+  Badge,
   Button,
   ButtonGroup,
   Card,
@@ -11,9 +12,11 @@ import {
   Form,
   FormLayout,
   Layout,
+  Link,
   List,
   Modal,
   Page,
+  ProgressBar,
   ResourceItem,
   ResourceList,
   Spinner,
@@ -23,7 +26,7 @@ import {
   Thumbnail,
 } from "@shopify/polaris";
 import { notEmptyString, useField, useForm } from "@shopify/react-form";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useAppQuery, useAuthenticatedFetch } from "../../hooks";
 const ResourceType = {
@@ -31,7 +34,7 @@ const ResourceType = {
   Collection: "Collection",
 };
 export default function PromoEdit() {
-  const { data } = useAppQuery({
+  const { data, refetch } = useAppQuery({
     url: "/api/promo/get",
     reactQueryOptions: {},
   });
@@ -45,6 +48,13 @@ export default function PromoEdit() {
   const fetch = useAuthenticatedFetch();
   const breadcrumbs = [{ content: "Promotion", url: "/" }];
   const [showResourcePicker, setShowResourcePicker] = useState(false);
+  const defaultValue = useMemo(() => {
+    if (promotion) {
+      const parsedValue = JSON.parse(promotion.value);
+      return parsedValue;
+    }
+    return null;
+  }, [promotion]);
   const onSubmit = useCallback(async (body) => {
     const parsedBody = body;
     parsedBody.key = id;
@@ -61,8 +71,19 @@ export default function PromoEdit() {
     }
     return { status: "fail" };
   }, []);
+  const onArchive = useCallback(async (body) => {
+    const parsedBody = { ...body };
+    parsedBody.key = id;
+    parsedBody.archived = true;
+    await fetch(`/api/promo/update?shopId=${shopId}`, {
+      method: "POST",
+      body: JSON.stringify(parsedBody),
+      headers: { "Content-Type": "application/json" },
+    });
+    return refetch();
+  }, []);
   const {
-    fields: { title, percentage },
+    fields: { title, percentage, active },
     dirty,
     reset,
     submitting,
@@ -82,19 +103,17 @@ export default function PromoEdit() {
     onSubmit,
     makeCleanAfterSubmit: true,
   });
-  console.log({ title });
+
   useEffect(() => {
     try {
-      if (promotion) {
-        const parsedValue = JSON.parse(promotion.value);
-        console.log({ promotion, parsedValue });
-        title.newDefaultValue(parsedValue.title);
-        percentage.newDefaultValue(parsedValue.percentage);
+      if (defaultValue) {
+        title.newDefaultValue(defaultValue.title);
+        percentage.newDefaultValue(defaultValue.percentage);
       }
     } catch (error) {
       console.error(error);
     }
-  }, [promotion]);
+  }, [defaultValue]);
 
   const toggleResourcePicker = useCallback(
     () => setShowResourcePicker(!showResourcePicker),
@@ -144,7 +163,33 @@ export default function PromoEdit() {
     setCurrent(0);
   }
   return (
-    <Page fullWidth>
+    <Page
+      fullWidth
+      breadcrumbs={breadcrumbs}
+      title={title.value || promotion.key}
+      titleMetadata={
+        !defaultValue?.archived ? (
+          <Badge status="success">Active</Badge>
+        ) : (
+          <Badge>Archived</Badge>
+        )
+      }
+      actionGroups={[
+        {
+          title: "Actions",
+          actions: [
+            {
+              content: "Archive",
+              destructive: true,
+              onAction: () => {
+                console.log("Archive");
+                onArchive({ ...defaultValue, active: false });
+              },
+            },
+          ],
+        },
+      ]}
+    >
       <TitleBar
         title="Edit promotion"
         breadcrumbs={breadcrumbs}
@@ -340,7 +385,7 @@ export default function PromoEdit() {
         </Layout.Section>
         <Layout.Section secondary>
           <Card title="Summary">
-            <Card.Section s title={title.value}>
+            <Card.Section title={title.value}>
               <List type="bullet">
                 <List.Item>
                   Selected Discount:{" "}
@@ -357,23 +402,37 @@ export default function PromoEdit() {
             </Card.Section>
             <Card.Section>
               <Button
-                onClick={() => {
+                onClick={async () => {
                   if (!items.length) {
                     setShowResourcePicker(true);
                   } else {
+                    if (dirty) {
+                      await submit();
+                    }
                     updateAllPrice(0, items);
                   }
                 }}
                 fullWidth
                 primary
               >
-                {current ? `${current}/${items.length}` : `Update price`}
+                {current ? `${current}/${items.length}` : `Save & Update price`}
               </Button>
+            </Card.Section>
+          </Card>
+          <Card title="Need help?">
+            <Card.Section>
+              Check out our video tutorials to learn more about creating and
+              managing promos.
+            </Card.Section>
+            <Card.Section>
+              <Link external url="/">
+                Watch tutorials?
+              </Link>
             </Card.Section>
           </Card>
         </Layout.Section>
       </Layout>
-      {current && (
+      {Boolean(current) && (
         <Modal
           title="Updating price"
           open={true}
@@ -388,6 +447,7 @@ export default function PromoEdit() {
                 {current}/{items.length}
               </div>
             </Stack>
+            <ProgressBar progress={(current / items.length) * 100} />
           </Modal.Section>
         </Modal>
       )}
@@ -455,7 +515,7 @@ const ProductsListByColection = ({
           initialSelectionIds={initialSelectionIds}
           resourceType={ResourceType.Product}
           showVariants={true}
-          selectMultiple={true}
+          selectMultiple={false}
           onCancel={toggleResourcePicker}
           onSelection={setProducts}
           open
