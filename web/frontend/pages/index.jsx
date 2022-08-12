@@ -133,8 +133,8 @@ export default function HomePage() {
                     image="https://cdn.shopify.com/s/files/1/2376/3301/products/emptystate-files.png"
                   >
                     <p>
-                      Create discount codes and automatic discounts that apply
-                      at checkout. You can also use discounts with{" "}
+                      Automatic update your products with discounts and
+                      promotions{" "}
                       <Link
                         external
                         url="https://help.shopify.com/en/manual/discounts/sales"

@@ -132,10 +132,10 @@ export default function PromoEdit() {
     while (current < items.length) {
       setCurrent(current + 1);
       let currentItem = items[current];
-      const { compareAtPrice, id } = currentItem;
-      let oldPrice = compareAtPrice;
+      const { compareAtPrice, price, id } = currentItem;
+      let oldPrice = compareAtPrice || price;
       let newPrice = (
-        ((100 - Number(percentage.value)) * Number(compareAtPrice)) /
+        ((100 - Number(percentage.value)) * Number(oldPrice)) /
         100
       ).toFixed(2);
       let promiseData = fetch(`/api/variant-price-update`, {
@@ -289,10 +289,9 @@ export default function PromoEdit() {
                         id,
                       } = item;
                       let imgUrl = product?.images?.[0]?.originalSrc;
-                      let oldPrice = compareAtPrice;
+                      let oldPrice = compareAtPrice || price;
                       let newPrice = (
-                        ((100 - Number(percentage.value)) *
-                          Number(compareAtPrice)) /
+                        ((100 - Number(percentage.value)) * Number(oldPrice)) /
                         100
                       ).toFixed(2);
                       return (
