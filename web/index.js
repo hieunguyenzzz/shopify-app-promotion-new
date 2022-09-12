@@ -4,6 +4,8 @@ import cookieParser from "cookie-parser";
 import express from "express";
 import { join } from "path";
 
+import Bookshelf from "bookshelf";
+import Knex from "knex";
 import { AppInstallations } from "./app_installations.js";
 import { setupGDPRWebHooks } from "./gdpr.js";
 import productCreator from "./helpers/product-creator.js";
@@ -14,7 +16,6 @@ import promoUpdate from "./helpers/promo-update.js";
 import variantPriceUpdate from "./helpers/variant-price-update.js";
 import applyAuthMiddleware from "./middleware/auth.js";
 import verifyRequest from "./middleware/verify-request.js";
-
 const USE_ONLINE_TOKENS = false;
 const TOP_LEVEL_OAUTH_COOKIE = "shopify_top_level_oauth";
 
@@ -25,7 +26,39 @@ const DEV_INDEX_PATH = `${process.cwd()}/frontend/`;
 const PROD_INDEX_PATH = `${process.cwd()}/frontend/dist/`;
 
 const DB_PATH = `${process.cwd()}/database.sqlite`;
+const knex = Knex({
+  client: "sqlite3",
+  connection: {
+    filename: DB_PATH,
+  },
+});
+const bookshelf = Bookshelf(knex);
+if (!bookshelf.knex.schema.hasTable("activities")) {
+  bookshelf.knex.schema
+    .createTable("activities", function (t) {
+      t.increments("id");
+      t.string("shop");
+      t.string("content");
+      t.timestamps();
+    })
+    .then(function () {
+      console.log("Created table activities");
+    });
+}
+const Activity = bookshelf.model("Activities", {
+  tableName: "activities",
+});
 
+bookshelf
+  .transaction((t) => {
+    return new Activity({ shop: "Hello" }).save(null, { transacting: t });
+  })
+  .then((activity) => {
+    console.log(activity);
+  })
+  .catch((err) => {
+    console.error(err);
+  });
 Shopify.Context.initialize({
   API_KEY: process.env.SHOPIFY_API_KEY,
   API_SECRET_KEY: process.env.SHOPIFY_API_SECRET,
