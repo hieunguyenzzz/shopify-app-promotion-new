@@ -163,7 +163,20 @@ export default function PromoEdit() {
     }
     setCurrent(0);
   }
-
+  function handleSelectProducts() {
+    if (dirty) {
+      submit();
+    }
+    setResourceType(ResourceType.Product);
+    setShowResourcePicker(true);
+  }
+  function handleSelectCollections() {
+    if (dirty) {
+      submit();
+    }
+    setResourceType(ResourceType.Collection);
+    setShowResourcePicker(true);
+  }
   return (
     <Page
       fullWidth
@@ -241,23 +254,11 @@ export default function PromoEdit() {
                 actions={[
                   {
                     content: "Select products",
-                    onAction: async () => {
-                      if (dirty) {
-                        await submit();
-                      }
-                      setResourceType(ResourceType.Product);
-                      setShowResourcePicker(true);
-                    },
+                    onAction: handleSelectProducts,
                   },
                   {
                     content: "Select collections",
-                    onAction: async () => {
-                      if (dirty) {
-                        await submit();
-                      }
-                      setResourceType(ResourceType.Collection);
-                      setShowResourcePicker(true);
-                    },
+                    onAction: handleSelectCollections,
                   },
                 ]}
               >
@@ -282,8 +283,12 @@ export default function PromoEdit() {
                       <EmptyState
                         heading="No items added"
                         action={{
-                          content: "Select products",
-                          onAction: () => setShowResourcePicker(true),
+                          content: "Add products",
+                          onAction: handleSelectProducts,
+                        }}
+                        secondaryAction={{
+                          content: "Add Collection",
+                          onAction: handleSelectCollections,
                         }}
                         image="https://cdn.shopify.com/s/files/1/2376/3301/products/emptystate-files.png"
                       >
