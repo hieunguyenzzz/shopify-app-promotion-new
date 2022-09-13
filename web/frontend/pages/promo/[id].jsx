@@ -6,7 +6,6 @@ import {
 import {
   Badge,
   Button,
-  ButtonGroup,
   Card,
   EmptyState,
   Form,
@@ -124,10 +123,12 @@ export default function PromoEdit() {
     ({ variants, ...product }) =>
       variants.map((variant) => ({ ...variant, product }))
   );
-  const [selected, setSelected] = useState([]);
   const [process, setProcess] = useState({});
   const [current, setCurrent] = useState(0);
   async function updateAllPrice(start = 0, items) {
+    if (dirty) {
+      submit();
+    }
     let current = start;
     while (current < items.length) {
       setCurrent(current + 1);
@@ -162,6 +163,7 @@ export default function PromoEdit() {
     }
     setCurrent(0);
   }
+
   return (
     <Page
       fullWidth
@@ -235,38 +237,47 @@ export default function PromoEdit() {
                 />
               </Card>
               <Card
-                title="Products"
+                title="Update product prices"
                 actions={[
                   {
                     content: "Select products",
-                    onAction: () => setShowResourcePicker(!showResourcePicker),
+                    onAction: async () => {
+                      if (dirty) {
+                        await submit();
+                      }
+                      setResourceType(ResourceType.Product);
+                      setShowResourcePicker(true);
+                    },
+                  },
+                  {
+                    content: "Select collections",
+                    onAction: async () => {
+                      if (dirty) {
+                        await submit();
+                      }
+                      setResourceType(ResourceType.Collection);
+                      setShowResourcePicker(true);
+                    },
                   },
                 ]}
               >
-                <Card.Section>
-                  <ButtonGroup segmented>
-                    <Button
-                      primary={ResourceType.Collection === resourceType}
-                      onClick={() => {
-                        setResourceType(ResourceType.Collection);
-                      }}
-                    >
-                      {ResourceType.Collection}
-                    </Button>
-                    <Button
-                      primary={ResourceType.Product === resourceType}
-                      onClick={() => {
-                        setResourceType(ResourceType.Product);
-                      }}
-                    >
-                      {ResourceType.Product}
-                    </Button>
-                  </ButtonGroup>
-                </Card.Section>
+                {Boolean(items.length) && (
+                  <Card.Section subdued>
+                    <Stack distribution="trailing">
+                      <div></div>
+                      <Button
+                        primary
+                        onClick={() => {
+                          updateAllPrice(0, items);
+                        }}
+                      >
+                        Update {items.length} products
+                      </Button>
+                    </Stack>
+                  </Card.Section>
+                )}
                 <Card.Section flush>
                   <ResourceList
-                    selectedItems={selected}
-                    onSelectionChange={setSelected}
                     emptyState={
                       <EmptyState
                         heading="No items added"
@@ -365,16 +376,22 @@ export default function PromoEdit() {
                     }}
                     resourceName={{ singular: "product", plural: "products" }}
                   />
-                  {showResourcePicker &&
-                    resourceType === ResourceType.Product && (
-                      <ProductsList
-                        {...{ selected, setProducts, toggleResourcePicker }}
-                      />
-                    )}
+                  <ProductsList
+                    {...{
+                      setProducts: (products) => {
+                        setProducts(products);
+                        setShowResourcePicker(false);
+                      },
+                      open:
+                        showResourcePicker &&
+                        resourceType === ResourceType.Product,
+                      toggleResourcePicker: toggleResourcePicker,
+                    }}
+                  />
                   {showResourcePicker &&
                     resourceType === ResourceType.Collection && (
                       <ProductsListByColection
-                        {...{ selected, setProducts, toggleResourcePicker }}
+                        {...{ setProducts, toggleResourcePicker }}
                       />
                     )}
                 </Card.Section>
@@ -399,36 +416,15 @@ export default function PromoEdit() {
                 <List.Item>{`${items.length} items selected`}</List.Item>
               </List>
             </Card.Section>
-            <Card.Section>
-              <Button
-                onClick={async () => {
-                  if (!items.length) {
-                    setShowResourcePicker(true);
-                  } else {
-                    if (dirty) {
-                      await submit();
-                    }
-                    updateAllPrice(0, items);
-                  }
-                }}
-                fullWidth
-                primary
-              >
-                {current ? `${current}/${items.length}` : `Save & Update price`}
-              </Button>
-            </Card.Section>
-          </Card>
-          <Card title="Need help?">
-            <Card.Section>
+            <Card.Section title="Need help?">
               Check out our video tutorials to learn more about creating and
-              managing promos.
-            </Card.Section>
-            <Card.Section>
+              managing promos.{" "}
               <Link external url="/">
                 Watch tutorials?
               </Link>
             </Card.Section>
           </Card>
+          <Card></Card>
         </Layout.Section>
       </Layout>
       {Boolean(current) && (
@@ -454,7 +450,7 @@ export default function PromoEdit() {
   );
 }
 
-const ProductsList = ({ selected, setProducts, toggleResourcePicker }) => {
+const ProductsList = ({ open, setProducts, toggleResourcePicker }) => {
   return (
     <ResourcePicker
       resourceType={ResourceType.Product}
@@ -462,15 +458,11 @@ const ProductsList = ({ selected, setProducts, toggleResourcePicker }) => {
       selectMultiple={true}
       onCancel={toggleResourcePicker}
       onSelection={setProducts}
-      open
+      open={open}
     />
   );
 };
-const ProductsListByColection = ({
-  selected,
-  setProducts,
-  toggleResourcePicker,
-}) => {
+const ProductsListByColection = ({ setProducts, toggleResourcePicker }) => {
   const [initialSelectionIds, setinitialSelectionIds] = useState();
   const [loading, setLoading] = useState();
   const fetch = useAuthenticatedFetch();
