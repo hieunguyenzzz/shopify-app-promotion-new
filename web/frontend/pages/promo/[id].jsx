@@ -177,16 +177,16 @@ export default function PromoEdit() {
           "Content-Type": "application/json",
         },
       });
-      setProcess({
+      setProcess((process) => ({
         ...process,
         [id]: promiseData,
-      });
+      }));
       let result = await promiseData.then((res) => res.json());
       current++;
-      setProcess({
+      setProcess((process) => ({
         ...process,
         [id]: result,
-      });
+      }));
     }
     setCurrent(0);
   }
@@ -371,7 +371,7 @@ export default function PromoEdit() {
                                   loading={process[id]?.then}
                                   onClick={() => {
                                     console.log({ products });
-                                    setProcess({
+                                    setProcess((process) => ({
                                       ...process,
                                       [id]: fetch(`/api/variant-price-update`, {
                                         method: "POST",
@@ -386,12 +386,12 @@ export default function PromoEdit() {
                                       })
                                         .then((res) => res.json())
                                         .then((res) => {
-                                          setProcess({
+                                          setProcess((process) => ({
                                             ...process,
                                             [id]: res,
-                                          });
+                                          }));
                                         }),
-                                    });
+                                    }));
                                   }}
                                   primary
                                 >
