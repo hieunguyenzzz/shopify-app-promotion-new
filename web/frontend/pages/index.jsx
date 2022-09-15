@@ -19,11 +19,11 @@ const tabs = [
     content: "Active",
     panelID: "active-content-1",
   },
-  {
-    id: "archived",
-    content: "Archived",
-    panelID: "archived-content-1",
-  },
+  // {
+  //   id: "archived",
+  //   content: "Archived",
+  //   panelID: "archived-content-1",
+  // },
 ];
 export default function HomePage() {
   const authenticatedFetch = useAuthenticatedFetch();

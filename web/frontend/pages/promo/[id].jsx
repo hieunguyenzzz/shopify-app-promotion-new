@@ -2,6 +2,8 @@ import {
   ContextualSaveBar,
   ResourcePicker,
   TitleBar,
+  useNavigate,
+  useToast,
 } from "@shopify/app-bridge-react";
 import {
   Badge,
@@ -33,6 +35,9 @@ const ResourceType = {
   Collection: "Collection",
 };
 export default function PromoEdit() {
+  const navigate = useNavigate();
+  const [process, setProcess] = useState({});
+  const [current, setCurrent] = useState(0);
   const { data, refetch } = useAppQuery({
     url: "/api/promo/get",
     reactQueryOptions: {},
@@ -47,6 +52,7 @@ export default function PromoEdit() {
   const fetch = useAuthenticatedFetch();
   const breadcrumbs = [{ content: "Promotion", url: "/" }];
   const [showResourcePicker, setShowResourcePicker] = useState(false);
+  const { show } = useToast();
   const defaultValue = useMemo(() => {
     if (promotion) {
       const parsedValue = JSON.parse(promotion.value);
@@ -71,6 +77,7 @@ export default function PromoEdit() {
     return { status: "fail" };
   }, []);
   const onArchive = useCallback(async (body) => {
+    show("Deleting...");
     const parsedBody = { ...body };
     parsedBody.key = id;
     parsedBody.archived = true;
@@ -79,8 +86,10 @@ export default function PromoEdit() {
       body: JSON.stringify(parsedBody),
       headers: { "Content-Type": "application/json" },
     });
-    return refetch();
+    show("Deleted");
+    return navigate("/");
   }, []);
+
   const {
     fields: { title, percentage, active },
     dirty,
@@ -121,11 +130,32 @@ export default function PromoEdit() {
 
   const items = (products?.selection || []).flatMap(
     ({ variants, ...product }) =>
-      variants.map((variant) => ({ ...variant, product }))
+      variants.map((variant) => {
+        const compareAtPrice =
+          process[variant.id]?.body?.data.productVariantUpdate.productVariant
+            .compareAtPrice || variant.compareAtPrice;
+        const price =
+          process[variant.id]?.body?.data.productVariantUpdate.productVariant
+            .price || variant.price;
+        let oldPrice = compareAtPrice || price;
+        return {
+          ...variant,
+          product,
+          compareAtPrice,
+          price,
+          newPrice: (
+            ((100 - Number(percentage.value)) * Number(oldPrice)) /
+            100
+          ).toFixed(2),
+        };
+      })
   );
-  const [process, setProcess] = useState({});
-  const [current, setCurrent] = useState(0);
-  async function updateAllPrice(start = 0, items) {
+
+  function handleDelete() {
+    console.log("Archive");
+    onArchive({ ...defaultValue, active: false });
+  }
+  async function updateAllPrice(start = 0) {
     if (dirty) {
       submit();
     }
@@ -133,12 +163,9 @@ export default function PromoEdit() {
     while (current < items.length) {
       setCurrent(current + 1);
       let currentItem = items[current];
-      const { compareAtPrice, price, id } = currentItem;
+      const { compareAtPrice, price, newPrice, id } = currentItem;
       let oldPrice = compareAtPrice || price;
-      let newPrice = (
-        ((100 - Number(percentage.value)) * Number(oldPrice)) /
-        100
-      ).toFixed(2);
+
       let promiseData = fetch(`/api/variant-price-update`, {
         method: "POST",
         body: JSON.stringify({
@@ -177,6 +204,7 @@ export default function PromoEdit() {
     setResourceType(ResourceType.Collection);
     setShowResourcePicker(true);
   }
+  console.log({ process });
   return (
     <Page
       fullWidth
@@ -194,12 +222,9 @@ export default function PromoEdit() {
           title: "Actions",
           actions: [
             {
-              content: "Archive",
+              content: "Delete",
               destructive: true,
-              onAction: () => {
-                console.log("Archive");
-                onArchive({ ...defaultValue, active: false });
-              },
+              onAction: handleDelete,
             },
           ],
         },
@@ -302,14 +327,12 @@ export default function PromoEdit() {
                         price,
                         compareAtPrice,
                         product,
+                        newPrice,
                         id,
                       } = item;
                       let imgUrl = product?.images?.[0]?.originalSrc;
                       let oldPrice = compareAtPrice || price;
-                      let newPrice = (
-                        ((100 - Number(percentage.value)) * Number(oldPrice)) /
-                        100
-                      ).toFixed(2);
+
                       return (
                         <ResourceItem
                           id={id}
@@ -330,7 +353,7 @@ export default function PromoEdit() {
                                 </TextStyle>
                               </h3>
                               <div>
-                                Old price: <span>{oldPrice}</span>
+                                Compare at price: <span>{oldPrice}</span>
                               </div>
                               <div>
                                 Current price: <span>{price}</span>
@@ -347,6 +370,7 @@ export default function PromoEdit() {
                                 <Button
                                   loading={process[id]?.then}
                                   onClick={() => {
+                                    console.log({ products });
                                     setProcess({
                                       ...process,
                                       [id]: fetch(`/api/variant-price-update`, {
@@ -405,31 +429,35 @@ export default function PromoEdit() {
           </Form>
         </Layout.Section>
         <Layout.Section secondary>
-          <Card title="Summary">
-            <Card.Section title={title.value}>
-              <List type="bullet">
-                <List.Item>
-                  Selected Discount:{" "}
-                  <TextStyle variation="strong">Percentage</TextStyle>
-                </List.Item>
-                <List.Item>
-                  <TextStyle variation="strong">
-                    {percentage.value} %{" "}
-                  </TextStyle>
-                  {` discount applied on ${items.length} items.`}
-                </List.Item>
-                <List.Item>{`${items.length} items selected`}</List.Item>
-              </List>
-            </Card.Section>
-            <Card.Section title="Need help?">
-              Check out our video tutorials to learn more about creating and
-              managing promos.{" "}
-              <Link external url="/">
-                Watch tutorials?
-              </Link>
-            </Card.Section>
-          </Card>
-          <Card></Card>
+          <Stack vertical>
+            <Card title="Summary">
+              <Card.Section title={title.value}>
+                <List type="bullet">
+                  <List.Item>
+                    Selected Discount:{" "}
+                    <TextStyle variation="strong">Percentage</TextStyle>
+                  </List.Item>
+                  <List.Item>
+                    <TextStyle variation="strong">
+                      {percentage.value} %{" "}
+                    </TextStyle>
+                    {` discount applied on ${items.length} items.`}
+                  </List.Item>
+                  <List.Item>{`${items.length} items selected`}</List.Item>
+                </List>
+              </Card.Section>
+              <Card.Section title="Need help?">
+                Check out our video tutorials to learn more about creating and
+                managing promos.{" "}
+                <Link external url="/">
+                  Watch tutorials?
+                </Link>
+              </Card.Section>
+            </Card>
+            <Button destructive onClick={handleDelete}>
+              Delete
+            </Button>
+          </Stack>
         </Layout.Section>
       </Layout>
       {Boolean(current) && (
