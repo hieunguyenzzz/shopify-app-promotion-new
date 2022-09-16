@@ -6,8 +6,12 @@ export const UPDATE_PRODUCT_VARIANT_PRICE_MUTATION = `
       productVariant {
         id
         title
+        displayName
         product {
           title
+        }
+        image {
+          url
         }
         sku
         price

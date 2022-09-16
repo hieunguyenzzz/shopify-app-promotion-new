@@ -14,6 +14,7 @@ import promoCreate from "./helpers/promo-create.js";
 import promoGet from "./helpers/promo-get.js";
 import promoUpdate from "./helpers/promo-update.js";
 import variantPriceUpdate from "./helpers/variant-price-update.js";
+import variantGet from "./helpers/variant.js";
 import applyAuthMiddleware from "./middleware/auth.js";
 import verifyRequest from "./middleware/verify-request.js";
 const USE_ONLINE_TOKENS = false;
@@ -261,6 +262,25 @@ export async function createServer(
 
     try {
       const data = await variantPriceUpdate(session, req);
+      res.status(status).send(data);
+    } catch (e) {
+      console.log(`Failed to process promo/get: ${e.message}`);
+      status = 500;
+      error = e.message;
+      res.status(status).send({ success: status === 200, error });
+    }
+  });
+  app.post("/api/variant", async (req, res) => {
+    const session = await Shopify.Utils.loadCurrentSession(
+      req,
+      res,
+      app.get("use-online-tokens")
+    );
+    let status = 200;
+    let error = null;
+
+    try {
+      const data = await variantGet(session, req);
       res.status(status).send(data);
     } catch (e) {
       console.log(`Failed to process promo/get: ${e.message}`);

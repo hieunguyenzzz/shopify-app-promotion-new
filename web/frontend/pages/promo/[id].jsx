@@ -1,6 +1,5 @@
 import {
   ContextualSaveBar,
-  ResourcePicker,
   TitleBar,
   useNavigate,
   useToast,
@@ -9,7 +8,6 @@ import {
   Badge,
   Button,
   Card,
-  EmptyState,
   Form,
   FormLayout,
   Layout,
@@ -18,19 +16,16 @@ import {
   Modal,
   Page,
   ProgressBar,
-  ResourceItem,
-  ResourceList,
-  Spinner,
   Stack,
   TextField,
   TextStyle,
-  Thumbnail,
 } from "@shopify/polaris";
 import { notEmptyString, useField, useForm } from "@shopify/react-form";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { PromoProductsCard } from "../../components/PromoProductsCard";
 import { useAppQuery, useAuthenticatedFetch } from "../../hooks";
-const ResourceType = {
+export const ResourceType = {
   Product: "Product",
   Collection: "Collection",
 };
@@ -60,22 +55,34 @@ export default function PromoEdit() {
     }
     return null;
   }, [promotion]);
-  const onSubmit = useCallback(async (body) => {
-    const parsedBody = body;
-    parsedBody.key = id;
-    console.log({ parsedBody });
-    /* use (authenticated) fetch from App Bridge to send the request to the API and, if successful, clear the form to reset the ContextualSaveBar and parse the response JSON */
-    const response = await fetch(`/api/promo/update?shopId=${shopId}`, {
-      method: "POST",
-      body: JSON.stringify(parsedBody),
-      headers: { "Content-Type": "application/json" },
-    });
-    if (response.ok) {
-      const result = await response.json();
-      return { status: "success" };
-    }
-    return { status: "fail" };
-  }, []);
+  console.log({ defaultValue });
+  const onSubmit = useCallback(
+    async (body) => {
+      const parsedBody = body;
+      parsedBody.key = id;
+      parsedBody.selected = (selection || []).map(({ variants, id }) => ({
+        id,
+        variants: variants.map(({ id }) => {
+          return {
+            id,
+          };
+        }),
+      }));
+      console.log({ parsedBody });
+      /* use (authenticated) fetch from App Bridge to send the request to the API and, if successful, clear the form to reset the ContextualSaveBar and parse the response JSON */
+      const response = await fetch(`/api/promo/update?shopId=${shopId}`, {
+        method: "POST",
+        body: JSON.stringify(parsedBody),
+        headers: { "Content-Type": "application/json" },
+      });
+      if (response.ok) {
+        const result = await response.json();
+        return { status: "success" };
+      }
+      return { status: "fail" };
+    },
+    [products]
+  );
   const onArchive = useCallback(async (body) => {
     show("Deleting...");
     const parsedBody = { ...body };
@@ -127,28 +134,9 @@ export default function PromoEdit() {
     () => setShowResourcePicker(!showResourcePicker),
     [showResourcePicker]
   );
-
-  const items = (products?.selection || []).flatMap(
-    ({ variants, ...product }) =>
-      variants.map((variant) => {
-        const compareAtPrice =
-          process[variant.id]?.body?.data.productVariantUpdate.productVariant
-            .compareAtPrice || variant.compareAtPrice;
-        const price =
-          process[variant.id]?.body?.data.productVariantUpdate.productVariant
-            .price || variant.price;
-        let oldPrice = compareAtPrice || price;
-        return {
-          ...variant,
-          product,
-          compareAtPrice,
-          price,
-          newPrice: (
-            ((100 - Number(percentage.value)) * Number(oldPrice)) /
-            100
-          ).toFixed(2),
-        };
-      })
+  const selection = products?.selection || defaultValue?.selected;
+  const items = (selection || []).flatMap(({ variants, ...product }) =>
+    variants.map((variant) => variant.id)
   );
 
   function handleDelete() {
@@ -156,16 +144,37 @@ export default function PromoEdit() {
     onArchive({ ...defaultValue, active: false });
   }
   async function updateAllPrice(start = 0) {
+    setProcess({});
     if (dirty) {
       submit();
     }
     let current = start;
     while (current < items.length) {
       setCurrent(current + 1);
-      let currentItem = items[current];
-      const { compareAtPrice, price, newPrice, id } = currentItem;
+      const id = items[current];
+      let variantData = await fetch(`/api/variant`, {
+        method: "POST",
+        body: JSON.stringify({
+          id: id,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }).then((res) => res.json());
+      console.log({ variantData: variantData });
+      const variant = variantData?.body.data.productVariant;
+      const { compareAtPrice, price } = variant;
       let oldPrice = compareAtPrice || price;
-
+      const newPrice = (
+        ((100 - Number(percentage.value)) * Number(oldPrice)) /
+        100
+      ).toFixed(2);
+      setProcess((process) => ({
+        ...process,
+        [id]: {
+          old: variant,
+        },
+      }));
       let promiseData = fetch(`/api/variant-price-update`, {
         method: "POST",
         body: JSON.stringify({
@@ -177,15 +186,16 @@ export default function PromoEdit() {
           "Content-Type": "application/json",
         },
       });
-      setProcess((process) => ({
-        ...process,
-        [id]: promiseData,
-      }));
+
       let result = await promiseData.then((res) => res.json());
+      const newVariant = result?.body.data.productVariantUpdate.productVariant;
       current++;
       setProcess((process) => ({
         ...process,
-        [id]: result,
+        [id]: {
+          old: variant,
+          new: newVariant,
+        },
       }));
     }
     setCurrent(0);
@@ -204,7 +214,8 @@ export default function PromoEdit() {
     setResourceType(ResourceType.Collection);
     setShowResourcePicker(true);
   }
-  console.log({ process });
+  console.log({ products });
+
   return (
     <Page
       fullWidth
@@ -274,157 +285,24 @@ export default function PromoEdit() {
                   prefix="%"
                 />
               </Card>
-              <Card
-                title="Update product prices"
-                actions={[
-                  {
-                    content: "Select products",
-                    onAction: handleSelectProducts,
-                  },
-                  {
-                    content: "Select collections",
-                    onAction: handleSelectCollections,
-                  },
-                ]}
-              >
-                {Boolean(items.length) && (
-                  <Card.Section subdued>
-                    <Stack distribution="trailing">
-                      <div></div>
-                      <Button
-                        primary
-                        onClick={() => {
-                          updateAllPrice(0, items);
-                        }}
-                      >
-                        Update {items.length} products
-                      </Button>
-                    </Stack>
-                  </Card.Section>
-                )}
-                <Card.Section flush>
-                  <ResourceList
-                    emptyState={
-                      <EmptyState
-                        heading="No items added"
-                        action={{
-                          content: "Add products",
-                          onAction: handleSelectProducts,
-                        }}
-                        secondaryAction={{
-                          content: "Add Collection",
-                          onAction: handleSelectCollections,
-                        }}
-                        image="https://cdn.shopify.com/s/files/1/2376/3301/products/emptystate-files.png"
-                      >
-                        {" "}
-                      </EmptyState>
-                    }
-                    items={items}
-                    renderItem={function renderItem(item) {
-                      const {
-                        displayName,
-                        price,
-                        compareAtPrice,
-                        product,
-                        newPrice,
-                        id,
-                      } = item;
-                      let imgUrl = product?.images?.[0]?.originalSrc;
-                      let oldPrice = compareAtPrice || price;
-
-                      return (
-                        <ResourceItem
-                          id={id}
-                          accessibilityLabel={`View details for ${displayName}`}
-                          media={
-                            <Thumbnail
-                              size="medium"
-                              source={imgUrl}
-                              customer={false}
-                            />
-                          }
-                        >
-                          <Stack distribution="fill">
-                            <div>
-                              <h3>
-                                <TextStyle variation="strong">
-                                  {displayName}
-                                </TextStyle>
-                              </h3>
-                              <div>
-                                Compare at price: <span>{oldPrice}</span>
-                              </div>
-                              <div>
-                                Current price: <span>{price}</span>
-                              </div>
-                            </div>
-                            <Stack vertical alignment="trailing">
-                              <Stack>
-                                <div>New price: </div>
-                                <TextStyle variation="strong">
-                                  {newPrice}
-                                </TextStyle>
-                              </Stack>
-                              {price !== newPrice && (
-                                <Button
-                                  loading={process[id]?.then}
-                                  onClick={() => {
-                                    console.log({ products });
-                                    setProcess((process) => ({
-                                      ...process,
-                                      [id]: fetch(`/api/variant-price-update`, {
-                                        method: "POST",
-                                        body: JSON.stringify({
-                                          id: id,
-                                          price: newPrice,
-                                          compareAtPrice: oldPrice,
-                                        }),
-                                        headers: {
-                                          "Content-Type": "application/json",
-                                        },
-                                      })
-                                        .then((res) => res.json())
-                                        .then((res) => {
-                                          setProcess((process) => ({
-                                            ...process,
-                                            [id]: res,
-                                          }));
-                                        }),
-                                    }));
-                                  }}
-                                  primary
-                                >
-                                  Update
-                                </Button>
-                              )}
-                            </Stack>
-                          </Stack>
-                        </ResourceItem>
-                      );
-                    }}
-                    resourceName={{ singular: "product", plural: "products" }}
-                  />
-                  <ProductsList
-                    {...{
-                      setProducts: (products) => {
-                        setProducts(products);
-                        setShowResourcePicker(false);
-                      },
-                      open:
-                        showResourcePicker &&
-                        resourceType === ResourceType.Product,
-                      toggleResourcePicker: toggleResourcePicker,
-                    }}
-                  />
-                  {showResourcePicker &&
-                    resourceType === ResourceType.Collection && (
-                      <ProductsListByColection
-                        {...{ setProducts, toggleResourcePicker }}
-                      />
-                    )}
-                </Card.Section>
-              </Card>
+              <PromoProductsCard
+                {...{
+                  selection: selection,
+                  handleSelectProducts,
+                  handleSelectCollections,
+                  items,
+                  updateAllPrice,
+                  process,
+                  products,
+                  setProcess,
+                  fetch,
+                  setProducts,
+                  setShowResourcePicker,
+                  showResourcePicker,
+                  resourceType,
+                  toggleResourcePicker,
+                }}
+              ></PromoProductsCard>
             </FormLayout>
           </Form>
         </Layout.Section>
@@ -482,69 +360,3 @@ export default function PromoEdit() {
     </Page>
   );
 }
-
-const ProductsList = ({ open, setProducts, toggleResourcePicker }) => {
-  return (
-    <ResourcePicker
-      resourceType={ResourceType.Product}
-      showVariants={true}
-      selectMultiple={true}
-      onCancel={toggleResourcePicker}
-      onSelection={setProducts}
-      open={open}
-    />
-  );
-};
-const ProductsListByColection = ({ setProducts, toggleResourcePicker }) => {
-  const [initialSelectionIds, setinitialSelectionIds] = useState();
-  const [loading, setLoading] = useState();
-  const fetch = useAuthenticatedFetch();
-  return (
-    <>
-      <ResourcePicker
-        resourceType={ResourceType.Collection}
-        showVariants={true}
-        selectMultiple={true}
-        onCancel={toggleResourcePicker}
-        onSelection={async ({ selection }) => {
-          setLoading(true);
-          await fetch(
-            `/api/products/collection?collectionId=${selection[0].id}`
-          )
-            .then((res) => res.json())
-            .then((res) => {
-              setinitialSelectionIds(
-                res.flatMap((item) => item.map(({ node }) => node))
-              );
-            });
-          setLoading(false);
-        }}
-        open
-      />
-      {loading && (
-        <Modal
-          title="Add products"
-          open={loading}
-          onClose={toggleResourcePicker}
-        >
-          <Modal.Section>
-            <Stack distribution="center">
-              <Spinner />
-            </Stack>
-          </Modal.Section>
-        </Modal>
-      )}
-      {initialSelectionIds && (
-        <ResourcePicker
-          initialSelectionIds={initialSelectionIds}
-          resourceType={ResourceType.Product}
-          showVariants={true}
-          selectMultiple={false}
-          onCancel={toggleResourcePicker}
-          onSelection={setProducts}
-          open
-        />
-      )}
-    </>
-  );
-};
