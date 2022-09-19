@@ -23,7 +23,6 @@ export function PromoProductsCard({
   resourceType,
   toggleResourcePicker,
 }) {
-  console.log({ process });
   const processITems = Object.values(process);
 
   return (
@@ -56,46 +55,48 @@ export function PromoProductsCard({
         </Card.Section>
       )}
       <Card.Section>
-        <ResourceList
-          items={processITems}
-          renderItem={function renderItem(item = {}) {
-            const { old, new: currentItem } = item;
-            const { compareAtPrice, id, price, displayName, image } = old;
-            let imgUrl = image?.url;
-            let oldPrice = compareAtPrice || price;
-            let newPrice = currentItem?.price;
+        {!!processITems.length && (
+          <ResourceList
+            items={processITems}
+            renderItem={function renderItem(item = {}) {
+              const { old, new: currentItem } = item;
+              const { compareAtPrice, id, price, displayName, image } = old;
+              let imgUrl = image?.url;
+              let oldPrice = compareAtPrice || price;
+              let newPrice = currentItem?.price;
 
-            return (
-              <ResourceItem
-                id={id}
-                accessibilityLabel={`View details for ${displayName}`}
-                media={
-                  <Thumbnail size="medium" source={imgUrl} customer={false} />
-                }
-              >
-                <Stack distribution="fill">
-                  <div>
-                    <h3>
-                      <TextStyle variation="strong">{displayName}</TextStyle>
-                    </h3>
+              return (
+                <ResourceItem
+                  id={id}
+                  accessibilityLabel={`View details for ${displayName}`}
+                  media={
+                    <Thumbnail size="medium" source={imgUrl} customer={false} />
+                  }
+                >
+                  <Stack distribution="fill">
                     <div>
-                      Compare at price: <span>{oldPrice}</span>
+                      <h3>
+                        <TextStyle variation="strong">{displayName}</TextStyle>
+                      </h3>
+                      <div>
+                        Compare at price: <span>{oldPrice}</span>
+                      </div>
+                      <div>
+                        Old price: <span>{price}</span>
+                      </div>
                     </div>
-                    <div>
-                      Old price: <span>{price}</span>
-                    </div>
-                  </div>
-                  <Stack vertical alignment="trailing">
-                    <div>
-                      Current price: <span>{newPrice}</span>
-                    </div>
+                    <Stack vertical alignment="trailing">
+                      <div>
+                        Current price: <span>{newPrice}</span>
+                      </div>
+                    </Stack>
                   </Stack>
-                </Stack>
-              </ResourceItem>
-            );
-          }}
-          resourceName={{ singular: "product", plural: "products" }}
-        />
+                </ResourceItem>
+              );
+            }}
+            resourceName={{ singular: "product", plural: "products" }}
+          />
+        )}
         <ProductsList
           {...{
             setProducts: (products) => {

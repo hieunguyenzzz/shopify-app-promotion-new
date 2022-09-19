@@ -43,7 +43,6 @@ export default function PromoEdit() {
     (item) => item.node.key === id
   )[0]?.node;
   const [resourceType, setResourceType] = useState(ResourceType.Collection);
-  const [products, setProducts] = useState();
   const fetch = useAuthenticatedFetch();
   const breadcrumbs = [{ content: "Promotion", url: "/" }];
   const [showResourcePicker, setShowResourcePicker] = useState(false);
@@ -56,33 +55,20 @@ export default function PromoEdit() {
     return null;
   }, [promotion]);
   console.log({ defaultValue });
-  const onSubmit = useCallback(
-    async (body) => {
-      const parsedBody = body;
-      parsedBody.key = id;
-      parsedBody.selected = (selection || []).map(({ variants, id }) => ({
-        id,
-        variants: variants.map(({ id }) => {
-          return {
-            id,
-          };
-        }),
-      }));
-      console.log({ parsedBody });
-      /* use (authenticated) fetch from App Bridge to send the request to the API and, if successful, clear the form to reset the ContextualSaveBar and parse the response JSON */
-      const response = await fetch(`/api/promo/update?shopId=${shopId}`, {
-        method: "POST",
-        body: JSON.stringify(parsedBody),
-        headers: { "Content-Type": "application/json" },
-      });
-      if (response.ok) {
-        const result = await response.json();
-        return { status: "success" };
-      }
-      return { status: "fail" };
-    },
-    [products]
-  );
+  const onSubmit = useCallback(async (body) => {
+    const parsedBody = body;
+    parsedBody.key = id;
+    const response = await fetch(`/api/promo/update?shopId=${shopId}`, {
+      method: "POST",
+      body: JSON.stringify(parsedBody),
+      headers: { "Content-Type": "application/json" },
+    });
+    if (response.ok) {
+      const result = await response.json();
+      return { status: "success" };
+    }
+    return { status: "fail" };
+  }, []);
   const onArchive = useCallback(async (body) => {
     show("Deleting...");
     const parsedBody = { ...body };
@@ -98,7 +84,7 @@ export default function PromoEdit() {
   }, []);
 
   const {
-    fields: { title, percentage, active },
+    fields: { title, percentage, selected },
     dirty,
     reset,
     submitting,
@@ -107,37 +93,32 @@ export default function PromoEdit() {
   } = useForm({
     fields: {
       title: useField({
-        value: "New promotion",
+        value: defaultValue?.title || "New",
         validates: [notEmptyString("Please enter a title")],
       }),
       percentage: useField({
-        value: 0,
+        value: defaultValue?.percentage || 0,
         validates: [notEmptyString("Please enter a percentage")],
       }),
+      selected: useField(defaultValue?.selected),
     },
     onSubmit,
     makeCleanAfterSubmit: true,
   });
-
   useEffect(() => {
     try {
       if (defaultValue) {
         title.newDefaultValue(defaultValue.title);
         percentage.newDefaultValue(defaultValue.percentage);
+        selected.newDefaultValue(defaultValue?.selected);
       }
     } catch (error) {
       console.error(error);
     }
   }, [defaultValue]);
 
-  const toggleResourcePicker = useCallback(
-    () => setShowResourcePicker(!showResourcePicker),
-    [showResourcePicker]
-  );
-  const selection = products?.selection || defaultValue?.selected;
-  const items = (selection || []).flatMap(({ variants, ...product }) =>
-    variants.map((variant) => variant.id)
-  );
+  const toggleResourcePicker = () =>
+    setShowResourcePicker((showResourcePicker) => !showResourcePicker);
 
   function handleDelete() {
     console.log("Archive");
@@ -201,9 +182,6 @@ export default function PromoEdit() {
     setCurrent(0);
   }
   function handleSelectProducts() {
-    if (dirty) {
-      submit();
-    }
     setResourceType(ResourceType.Product);
     setShowResourcePicker(true);
   }
@@ -214,8 +192,11 @@ export default function PromoEdit() {
     setResourceType(ResourceType.Collection);
     setShowResourcePicker(true);
   }
-  console.log({ products });
-
+  const items =
+    (selected?.value || []).flatMap(({ variants }) =>
+      variants.map((variant) => variant.id)
+    ) || [];
+  console.log({ selected, title, items });
   return (
     <Page
       fullWidth
@@ -287,16 +268,27 @@ export default function PromoEdit() {
               </Card>
               <PromoProductsCard
                 {...{
-                  selection: selection,
+                  selection: selected.value,
                   handleSelectProducts,
                   handleSelectCollections,
                   items,
                   updateAllPrice,
                   process,
-                  products,
                   setProcess,
                   fetch,
-                  setProducts,
+                  setProducts: (value) => {
+                    selected.onChange(
+                      value.selection.map(({ variants, id }) => ({
+                        id,
+                        variants: variants.map(({ id }) => {
+                          return {
+                            id,
+                          };
+                        }),
+                      }))
+                    );
+                    setShowResourcePicker(false);
+                  },
                   setShowResourcePicker,
                   showResourcePicker,
                   resourceType,

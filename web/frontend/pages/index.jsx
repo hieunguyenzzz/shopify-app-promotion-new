@@ -11,23 +11,16 @@ import {
   ResourceItem,
   ResourceList,
   Stack,
-  Tabs,
   TextStyle,
   Thumbnail,
   Tooltip,
 } from "@shopify/polaris";
 import { DragHandleMinor } from "@shopify/polaris-icons";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useReducer, useState } from "react";
 import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd";
 import { useAuthenticatedFetch } from "../hooks";
 import { useAppQuery } from "../hooks/useAppQuery";
-const tabs = [
-  {
-    id: "active",
-    content: "Promos",
-    panelID: "active-content-1",
-  },
-];
+
 export default function Multiple() {
   const { data, isLoading } = useAppQuery({
     url: "/api/promo/get",
@@ -37,33 +30,135 @@ export default function Multiple() {
     return <Loading />;
   }
   console.log({ data });
-  return <MultipleInner data={data} />;
+  return <MultipleInner data={data} isLoading={isLoading} />;
 }
+const initialState = {
+  eventId: null,
+  process: {},
+  current: 0,
+};
+function reducer(state, action) {
+  switch (action.type) {
+    case "start":
+      return {
+        ...initialState,
+        eventId: Date.now(),
+      };
+    case "reset":
+      return initialState;
+    case "next":
+      return {
+        ...state,
+        current: state.current + 1,
+        process: {
+          ...state.process,
+          ...action.payload,
+        },
+      };
+    default:
+      console.log({ action });
+      throw new Error("-1");
+  }
+}
+const useUpdateAllPrices = ({ variants = [] }) => {
+  const [{ eventId, process, current }, dispatch] = useReducer(
+    reducer,
+    initialState
+  );
+  const fetch = useAuthenticatedFetch();
+
+  useEffect(async () => {
+    const variant = variants[current];
+    async function updateVariantPrice(variantId, promotion) {
+      const id = variantId;
+      const percentage = promotion.percentage;
+      let variantData = await fetch(`/api/variant`, {
+        method: "POST",
+        body: JSON.stringify({
+          id: id,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }).then((res) => res.json());
+      const variant = variantData?.body.data.productVariant;
+      const { compareAtPrice, price } = variant;
+      let oldPrice = compareAtPrice || price;
+      const newPrice = (
+        ((100 - Number(percentage)) * Number(oldPrice)) /
+        100
+      ).toFixed(2);
+
+      let promiseData = fetch(`/api/variant-price-update`, {
+        method: "POST",
+        body: JSON.stringify({
+          id: id,
+          price: newPrice,
+          compareAtPrice: oldPrice,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      let result = await promiseData.then((res) => res.json());
+      const newVariant = result?.body.data.productVariantUpdate.productVariant;
+
+      dispatch({
+        type: "next",
+        payload: {
+          [id]: {
+            promotion,
+            old: variant,
+            new: newVariant,
+          },
+        },
+      });
+    }
+    console.log({ current });
+    if (eventId && variant) {
+      let variantId = variant.id;
+      let promotion = variant.promotion;
+      console.log({ variantId });
+      await updateVariantPrice(variantId, promotion);
+    }
+    return () => {};
+  }, [variants, process, eventId, current]);
+
+  return {
+    process,
+    isLoading: eventId && current <= variants.length,
+    reset: () => dispatch({ type: "reset" }),
+    start: () => dispatch({ type: "start" }),
+    cancel: () => {
+      dispatch({ type: "reset" });
+    },
+  };
+};
 function MultipleInner({ data }) {
-  const [items, setItems] = useState(
-    (data?.body?.data?.shop?.metafields?.edges || [])
-      .map((edge) => {
-        let parsedValue;
-        try {
-          parsedValue = JSON.parse(edge.node.value);
-        } catch (error) {
-          console.log(error);
-          parsedValue = {};
-        }
-        return {
-          ...edge.node,
-          ...parsedValue,
-        };
-      })
-      .filter((item) => !item.archived)
-  );
+  const [items, setItems] = useState([]);
+  useEffect(() => {
+    setItems(
+      (data?.body?.data?.shop?.metafields?.edges || [])
+        .map((edge) => {
+          let parsedValue;
+          try {
+            parsedValue = JSON.parse(edge.node.value);
+          } catch (error) {
+            console.log(error);
+            parsedValue = {};
+          }
+          return {
+            ...edge.node,
+            ...parsedValue,
+          };
+        })
+        .filter((item) => !item.archived)
+    );
+  }, [data]);
   console.log({ items });
-  const [selected, setSelected] = useState(0);
   const [current, setCurrent] = useState(0);
-  const handleTabChange = useCallback(
-    (selectedTabIndex) => setSelected(selectedTabIndex),
-    []
-  );
+
   const exited = {};
   const variants = items
     .flatMap((item) => {
@@ -81,70 +176,8 @@ function MultipleInner({ data }) {
     })
     .filter(Boolean);
   console.log({ variants });
-  const [process, setProcess] = useState({});
-  const [isLoading, setisLoading] = useState(false);
   const fetch = useAuthenticatedFetch();
-  async function updateAllPrice(start = 0) {
-    setisLoading(true);
-    setProcess({});
-    let current = start;
-    while (current < variants.length) {
-      setCurrent(current + 1);
-      const id = variants[current].id;
-      const percentage = variants[current].promotion.percentage;
-      const promotion = variants[current].promotion;
-      let variantData = await fetch(`/api/variant`, {
-        method: "POST",
-        body: JSON.stringify({
-          id: id,
-        }),
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }).then((res) => res.json());
-      console.log({ variantData: variantData });
-      const variant = variantData?.body.data.productVariant;
-      const { compareAtPrice, price } = variant;
-      let oldPrice = compareAtPrice || price;
-      const newPrice = (
-        ((100 - Number(percentage)) * Number(oldPrice)) /
-        100
-      ).toFixed(2);
-      setProcess((process) => ({
-        ...process,
-        [id]: {
-          old: variant,
-          promotion,
-        },
-      }));
-      let promiseData = fetch(`/api/variant-price-update`, {
-        method: "POST",
-        body: JSON.stringify({
-          id: id,
-          price: newPrice,
-          compareAtPrice: oldPrice,
-        }),
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
 
-      let result = await promiseData.then((res) => res.json());
-      const newVariant = result?.body.data.productVariantUpdate.productVariant;
-      current++;
-      setProcess((process) => ({
-        ...process,
-        [id]: {
-          promotion,
-          old: variant,
-          new: newVariant,
-        },
-      }));
-    }
-    setCurrent(0);
-    setisLoading(false);
-  }
-  const processITems = Object.values(process);
   const shopId = data?.body?.data?.shop?.id;
   const handleCreate = async () => {
     await fetch(`/api/promo/create?shopId=${shopId}`)
@@ -154,6 +187,8 @@ function MultipleInner({ data }) {
       });
   };
   const navigate = useNavigate();
+  const { start, isLoading, process } = useUpdateAllPrices({ variants });
+  const processITems = Object.values(process);
   return (
     <Page fullWidth>
       <TitleBar
@@ -162,38 +197,38 @@ function MultipleInner({ data }) {
       />
       <Layout>
         <Layout.Section secondary>
-          <Card>
-            <Tabs tabs={tabs} selected={selected} onSelect={handleTabChange}>
-              <Card.Section subdued>
-                <Stack distribution="trailing">
-                  <div></div>
-                  <Button primary onClick={handleCreate}>
-                    Create promotion
-                  </Button>
-                </Stack>
+          <Card title="Promos">
+            <Card.Section subdued>
+              <Stack distribution="trailing">
+                <div></div>
+                <Button primary onClick={handleCreate}>
+                  Create promotion
+                </Button>
+              </Stack>
+            </Card.Section>
+            {items?.length && (
+              <Card.Section flush>
+                <DragableList {...{ items, setItems }} />
               </Card.Section>
-              {items?.length && (
-                <Card.Section flush>
-                  <DragableList {...{ items, setItems }} />
-                </Card.Section>
-              )}
-            </Tabs>
+            )}
           </Card>
         </Layout.Section>
         <Layout.Section>
           <Card title="Logs">
             {Boolean(variants.length) && (
               <Card.Section subdued>
-                <Stack distribution="trailing">
-                  <div></div>
+                <Stack distribution="trailing" alignment="center">
+                  <div>
+                    {processITems.length}/{variants.length}
+                  </div>
                   <Button
                     loading={isLoading}
                     primary
                     onClick={() => {
-                      updateAllPrice(0, items);
+                      start();
                     }}
                   >
-                    Update {variants.length} products
+                    Update {processITems.length}/{variants.length} items
                   </Button>
                 </Stack>
               </Card.Section>
@@ -238,11 +273,8 @@ function MultipleInner({ data }) {
                         </div>
                         <Stack vertical alignment="trailing">
                           <div>
-                            Current price: <span>{newPrice}</span>
+                            New price: <span>{newPrice}</span>
                           </div>
-                        </Stack>
-                        <Stack alignment="trailing">
-                          <div></div>
                         </Stack>
                       </Stack>
                     </ResourceItem>
@@ -334,18 +366,18 @@ function ListItem(props) {
                     </List.Item>
                     <List.Item>{`${items.length} items selected`}</List.Item>
                   </List>
-                  <Stack distribution="equalSpacing">
-                    <div></div>
-                    <Button
-                      onClick={() => {
-                        navigate(url);
-                      }}
-                      url={url}
-                    >
-                      Edit
-                    </Button>
-                  </Stack>
                 </Stack>
+              </Stack>
+              <Stack distribution="equalSpacing">
+                <div></div>
+                <Button
+                  onClick={() => {
+                    navigate(url);
+                  }}
+                  url={url}
+                >
+                  Edit
+                </Button>
               </Stack>
             </div>
           </div>
