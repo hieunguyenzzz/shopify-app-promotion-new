@@ -57,7 +57,7 @@ function reducer(state, action) {
       };
     default:
       console.log({ action });
-      throw new Error("-1");
+      throw new Error("action undefined");
   }
 }
 const useUpdateAllPrices = ({ variants = [] }) => {
@@ -115,11 +115,9 @@ const useUpdateAllPrices = ({ variants = [] }) => {
         },
       });
     }
-    console.log({ current });
     if (eventId && variant) {
       let variantId = variant.id;
       let promotion = variant.promotion;
-      console.log({ variantId });
       await updateVariantPrice(variantId, promotion);
     }
     return () => {};
@@ -131,7 +129,7 @@ const useUpdateAllPrices = ({ variants = [] }) => {
     reset: () => dispatch({ type: "reset" }),
     start: () => dispatch({ type: "start" }),
     cancel: () => {
-      dispatch({ type: "reset" });
+      dispatch({ type: "cancel" });
     },
   };
 };
