@@ -125,7 +125,7 @@ const useUpdateAllPrices = ({ variants = [] }) => {
   }, [variants, process, eventId, current]);
   return {
     process,
-    isLoading: eventId && current <= variants.length - 1,
+    isLoading: eventId && current < variants.length,
     reset: () => dispatch({ type: "reset" }),
     start: () => dispatch({ type: "start" }),
     cancel: () => {
@@ -198,7 +198,7 @@ function MultipleInner({ data }) {
                   Update {processITems.length}/{variants.length} items
                 </div>
                 <Button primary onClick={start} loading={isLoading}>
-                  Update {processITems.length}/{variants.length} items
+                  Update
                 </Button>
               </Stack>
             </Card.Section>
