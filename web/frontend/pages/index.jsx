@@ -1,6 +1,8 @@
 import { TitleBar, useNavigate } from "@shopify/app-bridge-react";
 import {
+  Avatar,
   Button,
+  ButtonGroup,
   Card,
   Heading,
   Icon,
@@ -12,15 +14,20 @@ import {
   ResourceList,
   Stack,
   TextStyle,
-  Thumbnail,
   Tooltip,
 } from "@shopify/polaris";
-import { DragHandleMinor } from "@shopify/polaris-icons";
+import {
+  DeleteMajor,
+  DragHandleMinor,
+  ImageMajor,
+} from "@shopify/polaris-icons";
 import { useCallback, useEffect, useReducer, useState } from "react";
 import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd";
 import { useAuthenticatedFetch } from "../hooks";
 import { useAppQuery } from "../hooks/useAppQuery";
-
+function onlyUnique(value, index, self) {
+  return self.indexOf(value) === index;
+}
 export default function Multiple() {
   const { data, isLoading } = useAppQuery({
     url: "/api/promo/get",
@@ -134,6 +141,7 @@ const useUpdateAllPrices = ({ variants = [] }) => {
   };
 };
 function MultipleInner({ data }) {
+  const [selectedPromo, setSelectedPromo] = useState([]);
   const [items, setItems] = useState([]);
   useEffect(() => {
     setItems(
@@ -155,10 +163,10 @@ function MultipleInner({ data }) {
     );
   }, [data]);
   console.log({ items });
-  const [current, setCurrent] = useState(0);
 
   const exited = {};
-  const variants = items
+  const selectedItems = items.filter((item) => selectedPromo.includes(item.id));
+  const variants = selectedItems
     .flatMap((item) => {
       const { selected } = item;
       return (selected || []).flatMap(({ variants }) =>
@@ -187,6 +195,18 @@ function MultipleInner({ data }) {
   const navigate = useNavigate();
   const { start, isLoading, process } = useUpdateAllPrices({ variants });
   const processITems = Object.values(process);
+  const handleAdd = useCallback(({ id }) => {
+    setSelectedPromo((selectedPromo) =>
+      [id, ...selectedPromo].filter(onlyUnique)
+    );
+  }, []);
+  const handleDelete = useCallback(({ id }) => {
+    setSelectedPromo((selectedPromo) =>
+      selectedPromo.filter(
+        (value, index, self) => id !== value && onlyUnique(value, index, self)
+      )
+    );
+  }, []);
   return (
     <Page fullWidth>
       <TitleBar
@@ -206,19 +226,38 @@ function MultipleInner({ data }) {
             </Card.Section>
             {items?.length && (
               <Card.Section flush>
-                <DragableList {...{ items, setItems }} />
+                <DragableList {...{ items, setItems }} onAdd={handleAdd} />
               </Card.Section>
             )}
           </Card>
         </Layout.Section>
-        <Layout.Section>
-          <Card title="Logs">
-            {Boolean(variants.length) && (
+        {
+          <Layout.Section>
+            <Card title="Logs">
               <Card.Section subdued>
-                <Stack distribution="trailing" alignment="center">
-                  <div>
-                    {processITems.length}/{variants.length}
-                  </div>
+                <Stack distribution="equalSpacing" alignment="center">
+                  <Stack>
+                    {selectedItems.map((item) => (
+                      <ButtonGroup key={item.id} segmented>
+                        <Button
+                          disabled={isLoading}
+                          outline
+                          pressed={console.log}
+                          onClick={console.log}
+                        >
+                          {item.title}
+                        </Button>
+                        <Button
+                          disabled={isLoading}
+                          destructive
+                          pressed={console.log}
+                          onClick={() => handleDelete(item)}
+                          icon={DeleteMajor}
+                        ></Button>
+                      </ButtonGroup>
+                    ))}
+                  </Stack>
+
                   <Button
                     loading={isLoading}
                     primary
@@ -230,64 +269,66 @@ function MultipleInner({ data }) {
                   </Button>
                 </Stack>
               </Card.Section>
-            )}
-            <Card.Section fullWidth>
-              <ResourceList
-                loading={isLoading}
-                items={processITems}
-                renderItem={function renderItem(item = {}) {
-                  const { old, new: currentItem, promotion } = item;
-                  const { compareAtPrice, id, price, displayName, image } = old;
-                  let imgUrl = image?.url;
-                  let oldPrice = compareAtPrice || price;
-                  let newPrice = currentItem?.price;
+              <Card.Section fullWidth>
+                <ResourceList
+                  loading={isLoading}
+                  items={processITems}
+                  renderItem={function renderItem(item = {}) {
+                    const { old, new: currentItem, promotion } = item;
+                    const { compareAtPrice, id, price, displayName, image } =
+                      old;
+                    let imgUrl = image?.url;
+                    let oldPrice = compareAtPrice || price;
+                    let newPrice = currentItem?.price;
 
-                  return (
-                    <ResourceItem
-                      id={id}
-                      accessibilityLabel={`View details for ${displayName}`}
-                      media={
-                        <Thumbnail
-                          size="medium"
-                          source={imgUrl}
-                          customer={false}
-                        />
-                      }
-                    >
-                      <Stack distribution="fill">
-                        <div>
-                          <h3>
-                            <TextStyle variation="strong">
-                              {displayName}
-                            </TextStyle>
-                          </h3>
-                          <div>Promotion: {promotion.title}</div>
+                    return (
+                      <ResourceItem
+                        id={id}
+                        accessibilityLabel={`View details for ${displayName}`}
+                        media={
+                          <Avatar
+                            size="large"
+                            source={imgUrl || ImageMajor}
+                            customer={false}
+                            shape="square"
+                          />
+                        }
+                      >
+                        <Stack distribution="fill">
                           <div>
-                            Compare at price: <span>{oldPrice}</span>
+                            <h3>
+                              <TextStyle variation="strong">
+                                {displayName}
+                              </TextStyle>
+                            </h3>
+                            <div>Promotion: {promotion.title}</div>
+                            <div>
+                              Compare at price: <span>{oldPrice}</span>
+                            </div>
+                            <div>
+                              Old price: <span>{price}</span>
+                            </div>
                           </div>
-                          <div>
-                            Old price: <span>{price}</span>
-                          </div>
-                        </div>
-                        <Stack vertical alignment="trailing">
-                          <div>
-                            New price: <span>{newPrice}</span>
-                          </div>
+                          <Stack vertical alignment="trailing">
+                            <div>
+                              New price: <span>{newPrice}</span>
+                            </div>
+                          </Stack>
                         </Stack>
-                      </Stack>
-                    </ResourceItem>
-                  );
-                }}
-                resourceName={{ singular: "product", plural: "products" }}
-              />
-            </Card.Section>
-          </Card>
-        </Layout.Section>
+                      </ResourceItem>
+                    );
+                  }}
+                  resourceName={{ singular: "product", plural: "products" }}
+                />
+              </Card.Section>
+            </Card>
+          </Layout.Section>
+        }
       </Layout>
     </Page>
   );
 }
-function DragableList({ items, setItems }) {
+function DragableList({ items, setItems, onAdd }) {
   const handleDragEnd = useCallback(({ source, destination }) => {
     setItems((oldItems) => {
       if (!destination) {
@@ -310,6 +351,7 @@ function DragableList({ items, setItems }) {
                   key={item.key}
                   {...item}
                   index={index}
+                  onAdd={onAdd}
                   url={`/promo/${item.key}`}
                 />
               ))}
@@ -322,7 +364,7 @@ function DragableList({ items, setItems }) {
   );
 }
 function ListItem(props) {
-  const { id, title, percentage, index, selected, url } = props;
+  const { id, title, percentage, index, selected, url, onAdd } = props;
   const items = (selected || []).flatMap(({ variants }) =>
     variants.map((variant) => variant.id)
   );
@@ -368,14 +410,25 @@ function ListItem(props) {
               </Stack>
               <Stack distribution="equalSpacing">
                 <div></div>
-                <Button
-                  onClick={() => {
-                    navigate(url);
-                  }}
-                  url={url}
-                >
-                  Edit
-                </Button>
+                <ButtonGroup>
+                  <Button
+                    onClick={() => {
+                      navigate(url);
+                    }}
+                    url={url}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    primary
+                    onClick={() => {
+                      onAdd(props);
+                    }}
+                    url={url}
+                  >
+                    Add
+                  </Button>
+                </ButtonGroup>
               </Stack>
             </div>
           </div>
