@@ -1,5 +1,5 @@
 // @ts-check
-import { Shopify } from "@shopify/shopify-api";
+import { LATEST_API_VERSION, Shopify } from "@shopify/shopify-api";
 import cookieParser from "cookie-parser";
 import express from "express";
 import { join } from "path";
