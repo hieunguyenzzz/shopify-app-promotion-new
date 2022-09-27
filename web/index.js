@@ -1,11 +1,9 @@
 // @ts-check
-import { LATEST_API_VERSION, Shopify } from "@shopify/shopify-api";
+import { Shopify } from "@shopify/shopify-api";
 import cookieParser from "cookie-parser";
 import express from "express";
 import { join } from "path";
 
-import Bookshelf from "bookshelf";
-import Knex from "knex";
 import { AppInstallations } from "./app_installations.js";
 import { setupGDPRWebHooks } from "./gdpr.js";
 import productCreator from "./helpers/product-creator.js";
@@ -27,50 +25,6 @@ const DEV_INDEX_PATH = `${process.cwd()}/frontend/`;
 const PROD_INDEX_PATH = `${process.cwd()}/frontend/dist/`;
 
 const DB_PATH = `${process.cwd()}/database.sqlite`;
-const knex = Knex({
-  client: "sqlite3",
-  connection: {
-    filename: DB_PATH,
-  },
-});
-const bookshelf = Bookshelf(knex);
-if (!bookshelf.knex.schema.hasTable("activities")) {
-  bookshelf.knex.schema
-    .createTable("activities", function (t) {
-      t.increments("id");
-      t.string("shop");
-      t.string("content");
-      t.timestamps();
-    })
-    .then(function () {
-      console.log("Created table activities");
-    });
-}
-const Activity = bookshelf.model("Activities", {
-  tableName: "activities",
-});
-
-bookshelf
-  .transaction((t) => {
-    return new Activity({ shop: "Hello" }).save(null, { transacting: t });
-  })
-  .then((activity) => {
-    console.log(activity);
-  })
-  .catch((err) => {
-    console.error(err);
-  });
-Shopify.Context.initialize({
-  API_KEY: process.env.SHOPIFY_API_KEY,
-  API_SECRET_KEY: process.env.SHOPIFY_API_SECRET,
-  SCOPES: process.env.SCOPES.split(","),
-  HOST_NAME: process.env.HOST.replace(/https?:\/\//, ""),
-  HOST_SCHEME: process.env.HOST.split("://")[0],
-  API_VERSION: LATEST_API_VERSION,
-  IS_EMBEDDED_APP: true,
-  // This should be replaced with your preferred storage strategy
-  SESSION_STORAGE: new Shopify.Session.SQLiteSessionStorage(DB_PATH),
-});
 
 Shopify.Webhooks.Registry.addHandler("APP_UNINSTALLED", {
   path: "/api/webhooks",
