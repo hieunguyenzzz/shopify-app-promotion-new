@@ -12,7 +12,7 @@ import {
   TextStyle,
   useIndexResourceState,
 } from "@shopify/polaris";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useAppQuery } from "../hooks/useAppQuery";
 import { useAuthenticatedFetch } from "../hooks/useAuthenticatedFetch";
 const tabs = [
@@ -65,34 +65,37 @@ export default function HomePage() {
       return !pardsedValue.archived;
     }
   };
-  const rows = items.filter(filter).map((item) => {
-    const { key, id, title, percentage, updatedAt, archived } = item;
-    return {
-      key: id,
-      name: (
-        <Link
-          onClick={() => {
-            navigate(`/promo/${key}`);
-          }}
-          url={`/promo/${key}`}
-        >
-          {title || key}
-        </Link>
-      ),
-      type: "Percentage",
-      discount: (percentage || 0) + "%",
-      updated: new Date(updatedAt).toUTCString(),
-      status: (
-        <div>
-          {archived ? (
-            <Badge>Archived</Badge>
-          ) : (
-            <Badge status="success">Active</Badge>
-          )}
-        </div>
-      ),
-    };
-  });
+  const rows = useMemo(() =>
+    items.filter(filter).map((item) => {
+      const { key, id, title, percentage, updatedAt, archived } = item;
+      return {
+        id,
+        key: id,
+        name: (
+          <Link
+            onClick={() => {
+              navigate(`/promo/${key}`);
+            }}
+            url={`/promo/${key}`}
+          >
+            {title || key}
+          </Link>
+        ),
+        type: "Percentage",
+        discount: (percentage || 0) + "%",
+        updated: new Date(updatedAt).toUTCString(),
+        status: (
+          <div>
+            {archived ? (
+              <Badge>Archived</Badge>
+            ) : (
+              <Badge status="success">Active</Badge>
+            )}
+          </div>
+        ),
+      };
+    })
+  );
   const handleCreate = async () => {
     setLoading(true);
     await authenticatedFetch(`/api/promo/create?shopId=${shopId}`)
