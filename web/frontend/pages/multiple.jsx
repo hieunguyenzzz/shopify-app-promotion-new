@@ -3,6 +3,7 @@ import {
   Button,
   Card,
   DataTable,
+  EmptyState,
   Heading,
   Icon,
   Layout,
@@ -211,38 +212,43 @@ function MultipleInner({ data }) {
         </Layout.Section>
         <Layout.Section>
           <Card title="Logs">
-            <Card.Section fullWidth flush>
-              <DataTable
-                columnContentTypes={[
-                  "text",
-                  "text",
-                  "numeric",
-                  "numeric",
-                  "numeric",
-                ]}
-                headings={[
-                  "Product",
-                  "Promotion",
-                  "Compare At Price",
-                  "Old price",
-                  "New price",
-                ]}
-                rows={
-                  processITems?.map(
-                    ({
-                      old: { compareAtPrice, price: oldPrice, displayName },
-                      new: { price: newPrice },
-                      promotion,
-                    }) => [
-                      displayName,
-                      promotion.title,
-                      compareAtPrice,
-                      compareAtPrice || oldPrice,
-                      newPrice,
-                    ]
-                  ) || []
-                }
-              ></DataTable>
+            <Card.Section fullWidth>
+              {!processITems.length && (
+                <EmptyState heading="No item found"></EmptyState>
+              )}
+              {!!processITems.length && (
+                <DataTable
+                  columnContentTypes={[
+                    "text",
+                    "text",
+                    "numeric",
+                    "numeric",
+                    "numeric",
+                  ]}
+                  headings={[
+                    "Product",
+                    "Promotion",
+                    "Compare At Price",
+                    "Old price",
+                    "New price",
+                  ]}
+                  rows={
+                    processITems?.map(
+                      ({
+                        old: { compareAtPrice, price: oldPrice, displayName },
+                        new: { price: newPrice },
+                        promotion,
+                      }) => [
+                        displayName,
+                        promotion.title,
+                        compareAtPrice,
+                        compareAtPrice || oldPrice,
+                        newPrice,
+                      ]
+                    ) || []
+                  }
+                ></DataTable>
+              )}
             </Card.Section>
           </Card>
         </Layout.Section>

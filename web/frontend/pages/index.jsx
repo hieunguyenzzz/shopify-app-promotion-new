@@ -3,6 +3,7 @@ import {
   Badge,
   Card,
   EmptyState,
+  Filters,
   IndexTable,
   Layout,
   Link,
@@ -12,7 +13,7 @@ import {
   TextStyle,
   useIndexResourceState,
 } from "@shopify/polaris";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { useAppQuery } from "../hooks/useAppQuery";
 import { useAuthenticatedFetch } from "../hooks/useAuthenticatedFetch";
 const tabs = [
@@ -57,17 +58,41 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState();
   console.log({ selected });
+
+  const handleCreate = async () => {
+    setLoading(true);
+    await authenticatedFetch(`/api/promo/create?shopId=${shopId}`)
+      .then((res) => res.json())
+      .then((res) => {
+        navigate(`/promo/${res.body.data.metafieldsSet.metafields[0].key}`);
+      });
+    setLoading(false);
+  };
+
+  const [queryValue, setQueryValue] = useState("");
+
+  const handleQueryValueRemove = useCallback(() => setQueryValue(""), []);
+  const handleClearAll = useCallback(() => {
+    handleQueryValueRemove();
+  }, [handleQueryValueRemove]);
+
+  const filters = [];
+
+  const appliedFilters = [];
   const filter = (item) => {
-    const pardsedValue = JSON.parse(item.value);
     if (selected === 1) {
-      return pardsedValue.archived;
+      return item.archived;
     } else {
-      return !pardsedValue.archived;
+      return !item.archived;
     }
   };
-  const rows = useMemo(() =>
-    items.filter(filter).map((item) => {
+  const rows = items
+    .filter(filter)
+    .map((item) => {
       const { key, id, title, percentage, updatedAt, archived } = item;
+      if (!item?.title?.includes(queryValue)) {
+        return null;
+      }
       return {
         id,
         key: id,
@@ -95,16 +120,8 @@ export default function HomePage() {
         ),
       };
     })
-  );
-  const handleCreate = async () => {
-    setLoading(true);
-    await authenticatedFetch(`/api/promo/create?shopId=${shopId}`)
-      .then((res) => res.json())
-      .then((res) => {
-        navigate(`/promo/${res.body.data.metafieldsSet.metafields[0].key}`);
-      });
-    setLoading(false);
-  };
+    .filter(Boolean);
+
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(rows);
   console.log({ rows, selectedResources, allResourcesSelected });
@@ -124,6 +141,16 @@ export default function HomePage() {
         <Layout.Section fullWidth>
           <Card>
             <Tabs tabs={tabs} selected={selected} onSelect={handleTabChange}>
+              <Card.Section>
+                <Filters
+                  queryValue={queryValue}
+                  filters={filters}
+                  appliedFilters={appliedFilters}
+                  onQueryChange={setQueryValue}
+                  onQueryClear={handleQueryValueRemove}
+                  onClearAll={handleClearAll}
+                />
+              </Card.Section>
               <Card.Section flush>
                 <IndexTable
                   resourceName={{
